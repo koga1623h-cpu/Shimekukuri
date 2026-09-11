@@ -346,6 +346,44 @@ function Summary({ entries, onOpen }) {
   const dist = MOODS.map((m) => ({ ...m, n: moods.filter((v) => v === m.v).length }));
   const maxN = Math.max(1, ...dist.map((d) => d.n));
 
+  const [copied, setCopied] = useState(false);
+
+  const buildPrompt = () => {
+    const rangeLabel = range === 'week' ? '直近1週間' : '直近1か月';
+    const body = inRange.slice().reverse().map((k) => {
+      const e = entries[k]; const m = moodOf(e.mood);
+      let s = `【${fmtLong(k)}】\n気分: ${m ? `${m.label}（${e.mood}/5）` : '未記録'}`;
+      if ((e.good || '').trim()) s += `\nよかったこと: ${e.good.replace(/\n/g, ' / ')}`;
+      if ((e.improve || '').trim()) s += `\n改善したいこと: ${e.improve.replace(/\n/g, ' / ')}`;
+      if ((e.tomorrow || '').trim()) s += `\n明日やること: ${e.tomorrow.replace(/\n/g, ' / ')}`;
+      return s;
+    }).join('\n\n');
+    return (
+      `あなたは私の毎日の振り返りに寄り添うコーチです。以下は「しめくくり」アプリに記録した${rangeLabel}の振り返りです。\n\n` +
+      `次の観点で、やさしく具体的に分析してください。\n` +
+      `1. 気分の傾向（上向き・下向き、曜日や状況との関係など気づいたこと）\n` +
+      `2. 「よかったこと」から見える私の強みや、うまくいくパターン\n` +
+      `3. 「改善したいこと」に繰り返し出てくるテーマと、その対処のヒント\n` +
+      `4. 来週意識するとよいことを、短い行動として3つ\n\n` +
+      `最後にひと言、はげましをください。\n\n---\n\n${body}`
+    );
+  };
+
+  const handleAnalyze = async () => {
+    const text = buildPrompt();
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      try { document.execCommand('copy'); } catch {}
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2600);
+  };
+
   return (
     <div className="rise">
       <div className="flex bg-white border border-line rounded-full p-0.5 text-[13px] mb-5 w-fit">
@@ -370,6 +408,30 @@ function Summary({ entries, onOpen }) {
           </div>
         </div>
       </div>
+
+      {inRange.length > 0 && (
+        <div className="rounded-3xl p-4 mb-4" style={{ background: '#EAF3ED', border: '1px solid #CFE6D8' }}>
+          <div className="flex items-start gap-3">
+            <span className="w-9 h-9 rounded-2xl shrink-0 flex items-center justify-center text-[18px]" style={{ background: '#fff' }}>🌱</span>
+            <div className="min-w-0">
+              <div className="text-[14px] font-bold" style={{ color: '#1F6B47' }}>AIに分析してもらう</div>
+              <div className="text-[12px] mt-0.5 leading-relaxed" style={{ color: '#3E8A63' }}>
+                {range === 'week' ? '今週' : '今月'}の記録（{inRange.length}日分）を分析用のメッセージにまとめてコピーします。
+              </div>
+            </div>
+          </div>
+          <button onClick={handleAnalyze}
+            className="w-full mt-3 rounded-2xl py-3 text-[14px] font-bold text-white transition-all active:scale-[.99]"
+            style={{ background: copied ? '#2E9E6B' : '#1F6B47' }}>
+            {copied ? 'コピーしました' : 'まとめをコピー'}
+          </button>
+          {copied && (
+            <div className="text-[12px] mt-2 text-center leading-relaxed" style={{ color: '#2E7D52' }}>
+              Claudeアプリを開いて貼り付け、送信してください。
+            </div>
+          )}
+        </div>
+      )}
 
       {moods.length > 0 && (
         <div className="bg-white rounded-3xl border border-line p-4 mb-4">
